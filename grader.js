@@ -22,6 +22,7 @@ References:
 */
 
 var fs = require('fs');
+var sys = require('sys');
 var program = require('commander');
 var cheerio = require('cheerio');
 var rest = require('restler');
@@ -46,18 +47,12 @@ var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
-    var checks = loadChecks(checksfile).sort();
-    var out = {};
-    for(var ii in checks) {
-        var present = $(checks[ii]).length > 0;
-        out[checks[ii]] = present;
-    }
-    return out;
-};
 
-// checks html
+// loads html from a file and checks it
+// for exports only
+function checkHtmlFile(filename, checks) {
+    return checkHtml(fs.readFileSync(filename), checks);
+}
 function checkHtml(html, checks) {
     $ = cheerio.load(html);
     var out = {};
@@ -73,7 +68,8 @@ function checkHtml(html, checks) {
 function download(url, callback) {
     var resp = rest.get(url);
     resp.on('complete', function(result) {
-        if (result instanceof Error) {
+    
+	if (result instanceof Error) {
             // callback(result);
             sys.puts('Error: ' + result.message);
             this.retry(5000); // try again after 5 sec
@@ -92,11 +88,12 @@ var clone = function(fn) {
 
 if(require.main == module) {
     program
-	.option('-u, --url <url>', 'Path to url', URL_DEFAULT)
+	.option('-u, --url <url>', 'Path to url',  URL_DEFAULT)
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
  
        .parse(process.argv);
+
 // this function loads checks & checks html
     function check(err, html) {
         if (err) {
@@ -108,17 +105,19 @@ if(require.main == module) {
         var outJson = JSON.stringify(checkJson, null, 4);
         console.log(outJson);
     }
+
 //var checks = loadChecks(program.checks);
  if (program.url) {
-        // download the provided url and then check the html
+	// download the provided url and then check the html
         download(program.url, check);
-    } else if (program.file) {
+    } else {//if (program.file) {
         // load html from a file and then check it
         fs.readFile(program.file, check);
     }
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+ //   var checkJson = checkHtmlFile(program.file, program.checks);
+ //   var outJson = JSON.stringify(checkJson, null, 4);
+ //   console.log(outJson);
 } else {
+    exports.loadChecks = loadChecks;
     exports.checkHtmlFile = checkHtmlFile;
 }
